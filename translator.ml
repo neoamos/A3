@@ -415,7 +415,7 @@ let reduce_1_prod (astack:parse_tree list) (rhs_len:int) : parse_tree list =
     | _ -> raise (Failure "expected nonterminal at top of astack") in
    helper astack rhs_len [];;
 
-let sum_ave_prog = "read a read b sum := e - a + b  write sum write sum / 2";;
+let sum_ave_prog = "read a read b sum := e * (a + b)  write sum write sum / 2";;
 let primes_prog = "
      read n
      cp := 2
@@ -644,52 +644,52 @@ let rec translate (ast:ast_sl) =
 
 
 
-and translate_sl (ast:ast_sl) =
+and translate_sl (ast:ast_sl) : string=
     match ast with
-    | h::t -> translate_s h @ translate_sl t
-    | h::[] -> translate_s h
+    | h::t -> translate_s h ^ translate_sl t
     | [] -> ""
 
-and translate_s (ast:ast_s) =
+and translate_s (ast:ast_s) :string =
     match ast with
-    | AST_assign a -> traslate_assign a
+    | AST_assign a -> translate_assign a
     | AST_read a -> translate_read a
     | AST_write a -> translate_write a
     | AST_if a -> translate_if a
     | AST_do a -> translate_do a
     | AST_check a -> translate_check a
-    | AST_error a -> "Syntax Error."
+    | AST_error -> "Syntax Error."
 
 
-and translate_assign (ast:string*ast_e) =
+and translate_assign (ast:string*ast_e): string =
     let (s,e) = ast in
-    "int " @ s @ " = " @ translate_expr e @";\n"
+    "int " ^ s ^ " = " ^ translate_expr e ^";\n"
 
-and translate_read (ast:string) =
-    ast @ " = getint(); \n"
+and translate_read (ast:string): string =
+    ast ^ " = getint(); \n"
 
-and translate_write (ast:ast_e) =
-    "putint(" @ traslate_expr ast @ ");\n"
+and translate_write (ast:ast_e) :string=
+    "putint(" ^ translate_expr ast ^ ");\n"
 
-and translate_if (ast:ast_e*ast_sl) =
+and translate_if (ast:ast_e*ast_sl) :string=
     let (e,sl) = ast in
-    "if(" @ translate_expr e @ ") { \n" @ translate_sl sl @"\n}\n"
+    "if(" ^ translate_expr e ^ ") { \n" ^ translate_sl sl ^"\n}\n"
 
-and translate_do (ast:ast_sl) =
-    "while(true){\n" + translate_sl ast +"\n}\n"
+and translate_do (ast:ast_sl) :string=
+    "while(true){\n" ^ translate_sl ast ^"\n}\n"
 
-and translate_check (ast:ast_e) =
-    "if(!" @ translate_expr ast @ ") {break;} \n"
+and translate_check (ast:ast_e) : string=
+    "if(!" ^ translate_expr ast ^ ") {break;} \n"
 
-and translate_expr (ast:ast_e) =
+and translate_expr (ast:ast_e): string =
     match ast with
-    | AST_binop (op,e1,e2) -> translate_expr e1 @ op @ translate_expr e2
+    | AST_binop (op,e1,e2) -> translate_expr e1 ^ op ^ translate_expr e2
     | AST_id a -> a
     | AST_num a -> a
+in
 
 
 
 
 
 
-translate ast;;
+print_string (translate ast);;

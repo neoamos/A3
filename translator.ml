@@ -415,7 +415,7 @@ let reduce_1_prod (astack:parse_tree list) (rhs_len:int) : parse_tree list =
     | _ -> raise (Failure "expected nonterminal at top of astack") in
    helper astack rhs_len [];;
 
-let sum_ave_prog = "read a read b sum := a + b write sum write sum / 2";;
+let sum_ave_prog = "read a read b sum := e - a + b  write sum write sum / 2";;
 let primes_prog = "
      read n
      cp := 2
@@ -553,7 +553,7 @@ and ast_e =
 let rec ast_ize_P (p:parse_tree) : ast_sl =
   (* your code should replace the following line *)
   match p with
-  | PT_nt ("P", [PT_nt ("SL", sl); PT_term "$$"]) -> ast_ize_SL (PT_nt ("SL", sl))
+  | PT_nt ("P", [PT_nt ("SL", sl) ; PT_term "$$"]) -> ast_ize_SL (PT_nt ("SL", sl))
   | _ -> raise (Failure "Malformed parse tree in ast_ize_P")
 
 and ast_ize_SL (sl:parse_tree) : ast_sl =
@@ -610,7 +610,7 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 ;;
 
-let pt = parse ecg_parse_table sum_ave_prog;;
+let pt = parse ecg_parse_table primes_prog;;
 ast_ize_P pt;;
 (*******************************************************************
     Translate to C
@@ -622,13 +622,14 @@ ast_ize_P pt;;
    the program but never read, you'll also get a warning message
    indicating their names and the lines on which the writes occur.  Your
    C program should contain code to check for dynamic semantic errors. *)
-
-(*  commented out so this code will complile
+(*
 
 let rec translate (ast:ast_sl)
-    :  string *  string
-    (* warnings  output_program *) = ...
-
+=
+  match ast with
+  |   a::b -> 1
+  | _ -> 2
+                     
 and translate_sl (...
 
 and translate_s (...

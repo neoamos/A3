@@ -617,6 +617,10 @@ let ast = ast_ize_P pt;;
 
 
 
+let 
+
+
+
 let rec translate (ast:ast_sl) =
     let precode =
     "#include <stdio.h>\n"^
@@ -650,63 +654,69 @@ let rec translate (ast:ast_sl) =
     "int main(){\n"
     in
 
-    let postcode = "return 0;\n}" in
-    
-    precode^(translate_sl ast)^postcode
+    let postcode = "return 0;\n}\n" in
+    let (innercode,all_vars,used_vars) = translate_sl ast in
+    precode^(List.fold_left (function y x = y ^ "int* " ^ x ^ " = NULL;\n") "" vars )^innercode^postcode
 
 
 
 
-and translate_sl (ast:ast_sl) : string=
+and translate_sl (ast:ast_sl) (av:string list) (uv:string list) : string*string list*string list=
     match ast with
-    | h::t -> translate_s h ^ translate_sl t
-    | [] -> ""
+    | h::t -> let (s,avv,uvv) = translate_s h in
+              let (sl,avvv,uvvv = translate_sl t in
+              (s ^ tsl, avvv, uvvv)
+    | [] -> ("", av, uv)
 
-and translate_s (ast:ast_s) :string =
+and translate_s (ast:ast_s) (av:string list) (uv:string list) :string*string list*string list =
     match ast with
-    | AST_assign a -> translate_assign a
-    | AST_read a -> translate_read a
-    | AST_write a -> translate_write a
-    | AST_if a -> translate_if a
-    | AST_do a -> translate_do a
-    | AST_check a -> translate_check a
-    | AST_error -> "Syntax Error."
+    | AST_assign a -> translate_assign a av uv
+    | AST_read a -> translate_read a av uv
+    | AST_write a -> translate_write a av uv
+    | AST_if a -> translate_if a av uv
+    | AST_do a -> translate_do a av uv
+    | AST_check a -> translate_check a av uv
+    | AST_error -> raise (Failure "Syntax error.")
 
 
-and translate_assign (ast:string*ast_e): string =
+and translate_assign (ast:string*ast_e) (av:string list) (uv:string list) :string*string list*string list =
     let (s,e) = ast in
-    "setval(&" ^ s ^ "," ^ translate_expr e ^");\n"
+    let (expr,avv,uvv) = translate_expr e av uv in
+    ("setval(&" ^ s ^ "," ^ expr ^");\n", s::avv, uvv)
 
-and translate_read (ast:string): string =
-    "setval(&" ^ ast ^ ", getint()); \n"
+and translate_read (ast:string) (av:string list) (uv:string list) :string*string list*string list =
+    ("setval(&" ^ ast ^ ", getint()); \n", ast::av, uv)
 
-and translate_write (ast:ast_e) :string=
-    "putint(" ^ translate_expr ast ^ ");\n"
+and translate_write (ast:ast_e) (av:string list) (uv:string list) :string*string list*string list =
+    let (expr,avv,uvv) = translate_exp ast in
+    ("putint(" ^ translate_expr ast ^ ");\n", avv, uvv)
 
-and translate_if (ast:ast_e*ast_sl) :string=
+and translate_if (ast:ast_e*ast_sl) (av:string list) (uv:string list) :string*string list*string list =
     let (e,sl) = ast in
-    "if(" ^ translate_expr e ^ ") { \n" ^ translate_sl sl ^"}\n"
+    let (expr,avv,uvv) = translate_expr e av uv in
+    let (sl,avvv,uvvv) = translate_sl sl avv uvv in
+    ("if(" ^ expr ^ ") { \n" ^ sl ^"}\n", avvv, uvvv)
 
-and translate_do (ast:ast_sl) :string=
-    "while(1){\n" ^ translate_sl ast ^"}\n"
+and translate_do (ast:ast_sl) (av:string list) (uv:string list) :string*string list*string list =
+    let (sl,avv,uvv) = translate_sl ast av uv in
+    ("while(1){\n" ^ sl ^"}\n", avv, uvv)
 
-and translate_check (ast:ast_e) : string=
-    "if(!" ^ translate_expr ast ^ ") {break;} \n"
+and translate_check (ast:ast_e) (av:string list) (uv:string list) :string*string list*string list =
+    let (expr,avv,uvv) = translate_expr ast av uv in
+    ("if(!" ^ expr ^ ") {break;} \n", avv, uvv)
 
-and translate_expr (ast:ast_e): string =
+and translate_expr (ast:ast_e) (av:string list) (uv:string list) :string*string list*string list =
     match ast with
-    | AST_id a -> "getval(" ^ a ^ ")"
-    | AST_num a -> a
+    | AST_id a -> ("getval(" ^ a ^ ")", a::av, a::uv)
+    | AST_num a -> (a, av, uv)
     | AST_binop (op,e1,e2) 
-    -> match op with
-    | "/" -> "(" ^ translate_expr e1 ^ op ^ "notZero(" ^ translate_expr e2 ^ "))"
-    | "<>" -> "(" ^ translate_expr e1 ^ "!=" ^ translate_expr e2 ^ ")"
-    | oper -> "(" ^ translate_expr e1 ^ oper ^ translate_expr e2 ^ ")"
+    -> let (expr1,avv,uvv) = translate_expr e1 av uvin
+       let (expr2,avvv,uvvv) = translate_expr e2 avv uvv in
+    match op with
+    | "/" -> ("(" ^ expr1^ op ^ "notZero(" ^ expr2 ^ "))", avvv, uvvv)
+    | "<>" -> ("(" ^ expr1 ^ "!=" ^ expr2 ^ ")", avvv, uvvv)
+    | oper -> ("(" ^ expr1 ^ oper ^ expr2 ^ ")", avvv, uvvv)
 in
-
-
-
-
 
 
 print_string (translate ast);;

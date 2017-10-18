@@ -612,34 +612,47 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
 
 
 
-let pt = parse ecg_parse_table sum_ave_prog;;
+let pt = parse ecg_parse_table primes_prog;;
 let ast = ast_ize_P pt;;
 
 
 
 let rec translate (ast:ast_sl) =
-    let ccode =
-    [
-    "#include <stdio.h>";
-    "#include <stdlib.h>";
-    "";
-    "int getint() {";
-    "int a;";
-    "if(scanf(\"%d\", &a)>0){";
-    "return a;";
-    "} else {";
-    "printf(\"Input must be integer.\");";
-    "return;";
-    "}";
-    "}";
-    "";
-    "void putint(int n) {";
-    "printf(\"%d\\n\", n);";
-    "}";
-    "";
-    ] in
+    let precode =
+    "#include <stdio.h>\n"^
+    "#include <stdlib.h>\n\n"^
+    "int getint() {\n"^
+    "int a;\n"^
+    "if(scanf(\"%d\", &a)>0){\n"^
+    "return a;\n"^
+    "} else {\n"^
+    "printf(\"Input must be integer.\");\n"^
+    "exit(1);\n"^
+    "}\n"^
+    "}\n"^
+    "\n"^
+    "void putint(int n) {\n"^
+    "printf(\"%d\\n\", n);\n"^
+    "}\n"^
+    "int notZero(int n) {\n"^
+    "if (n==0) {\n"^
+    "printf(\"Division by zero.\");\n"^
+    "exit(1);\n"^
+    "} else {\n"^
+    "return n;\n}\n}\n"^
+    "int getval(int* id) {\n"^
+    "if(id==NULL){ \n" ^
+    "printf(\"Error: tried to use an uninitialized value\");\nexit(0);\n} "^
+    "else {\n return *id; \n}\n}\n"^
+    "void setval(int** id, int v) {\n"^
+    "if(*id==NULL){ *id = (int*)malloc(sizeof(int)); }\n"^
+    "**id = v;\n}\n"^
+    "int main(){\n"
+    in
 
-    translate_sl ast
+    let postcode = "return 0;\n}" in
+    
+    precode^(translate_sl ast)^postcode
 
 
 
@@ -662,29 +675,33 @@ and translate_s (ast:ast_s) :string =
 
 and translate_assign (ast:string*ast_e): string =
     let (s,e) = ast in
-    "int " ^ s ^ " = " ^ translate_expr e ^";\n"
+    "setval(&" ^ s ^ "," ^ translate_expr e ^");\n"
 
 and translate_read (ast:string): string =
-    ast ^ " = getint(); \n"
+    "setval(&" ^ ast ^ ", getint()); \n"
 
 and translate_write (ast:ast_e) :string=
     "putint(" ^ translate_expr ast ^ ");\n"
 
 and translate_if (ast:ast_e*ast_sl) :string=
     let (e,sl) = ast in
-    "if(" ^ translate_expr e ^ ") { \n" ^ translate_sl sl ^"\n}\n"
+    "if(" ^ translate_expr e ^ ") { \n" ^ translate_sl sl ^"}\n"
 
 and translate_do (ast:ast_sl) :string=
-    "while(true){\n" ^ translate_sl ast ^"\n}\n"
+    "while(1){\n" ^ translate_sl ast ^"}\n"
 
 and translate_check (ast:ast_e) : string=
     "if(!" ^ translate_expr ast ^ ") {break;} \n"
 
 and translate_expr (ast:ast_e): string =
     match ast with
-    | AST_binop (op,e1,e2) -> translate_expr e1 ^ op ^ translate_expr e2
-    | AST_id a -> a
+    | AST_id a -> "getval(" ^ a ^ ")"
     | AST_num a -> a
+    | AST_binop (op,e1,e2) 
+    -> match op with
+    | "/" -> "(" ^ translate_expr e1 ^ op ^ "notZero(" ^ translate_expr e2 ^ "))"
+    | "<>" -> "(" ^ translate_expr e1 ^ "!=" ^ translate_expr e2 ^ ")"
+    | oper -> "(" ^ translate_expr e1 ^ oper ^ translate_expr e2 ^ ")"
 in
 
 

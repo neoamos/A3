@@ -617,9 +617,6 @@ let ast = ast_ize_P pt;;
 
 
 
-let 
-
-
 
 let rec translate (ast:ast_sl) =
     let precode =
@@ -655,17 +652,17 @@ let rec translate (ast:ast_sl) =
     in
 
     let postcode = "return 0;\n}\n" in
-    let (innercode,all_vars,used_vars) = translate_sl ast in
-    precode^(List.fold_left (function y x = y ^ "int* " ^ x ^ " = NULL;\n") "" vars )^innercode^postcode
+    let (innercode,all_vars,used_vars) = translate_sl ast [] [] in
+    precode^(List.fold_left (fun y x -> y ^ "int* " ^ x ^ " = NULL;\n") "" (unique_sort all_vars) )^innercode^postcode
 
 
 
 
 and translate_sl (ast:ast_sl) (av:string list) (uv:string list) : string*string list*string list=
     match ast with
-    | h::t -> let (s,avv,uvv) = translate_s h in
-              let (sl,avvv,uvvv = translate_sl t in
-              (s ^ tsl, avvv, uvvv)
+    | h::t -> let (s,avv,uvv) = translate_s h av uv in
+      let (sl,avvv,uvvv) = translate_sl t avv uvv in
+              (s ^ sl, avvv, uvvv)
     | [] -> ("", av, uv)
 
 and translate_s (ast:ast_s) (av:string list) (uv:string list) :string*string list*string list =
@@ -688,8 +685,8 @@ and translate_read (ast:string) (av:string list) (uv:string list) :string*string
     ("setval(&" ^ ast ^ ", getint()); \n", ast::av, uv)
 
 and translate_write (ast:ast_e) (av:string list) (uv:string list) :string*string list*string list =
-    let (expr,avv,uvv) = translate_exp ast in
-    ("putint(" ^ translate_expr ast ^ ");\n", avv, uvv)
+    let (expr,avv,uvv) = translate_expr ast av uv in
+    ("putint(" ^ expr ^ ");\n", avv, uvv)
 
 and translate_if (ast:ast_e*ast_sl) (av:string list) (uv:string list) :string*string list*string list =
     let (e,sl) = ast in
@@ -709,8 +706,8 @@ and translate_expr (ast:ast_e) (av:string list) (uv:string list) :string*string 
     match ast with
     | AST_id a -> ("getval(" ^ a ^ ")", a::av, a::uv)
     | AST_num a -> (a, av, uv)
-    | AST_binop (op,e1,e2) 
-    -> let (expr1,avv,uvv) = translate_expr e1 av uvin
+    | AST_binop (op,e1,e2)
+    -> let (expr1,avv,uvv) = translate_expr e1 av uv in
        let (expr2,avvv,uvvv) = translate_expr e2 avv uvv in
     match op with
     | "/" -> ("(" ^ expr1^ op ^ "notZero(" ^ expr2 ^ "))", avvv, uvvv)

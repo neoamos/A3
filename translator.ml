@@ -415,34 +415,6 @@ let reduce_1_prod (astack:parse_tree list) (rhs_len:int) : parse_tree list =
     | _ -> raise (Failure "expected nonterminal at top of astack") in
    helper astack rhs_len [];;
 
-let sum_ave_prog = "read a read b sum := e * (a + b)  write sum write sum / 2";;
-let primes_prog = "
-     read n
-     cp := 2
-     do check n > 0
-         found := 0
-         cf1 := 2
-         cf1s := cf1 * cf1
-         do check cf1s <= cp
-             cf2 := 2
-             pr := cf1 * cf2
-             do check pr <= cp
-                 if pr == cp
-                     found := 1
-                 fi
-                 cf2 := cf2 + 1
-                 pr := cf1 * cf2
-             od
-             cf1 := cf1 + 1
-             cf1s := cf1 * cf1
-         od
-         if found == 0
-             write cp
-             n := n - 1
-         fi
-         cp := cp + 1
-     od";;
-
 type parse_action = PA_error | PA_prediction of string list;;
 (* Double-index to find prediction (list of RHS symbols) for
    nonterminal nt and terminal t.
@@ -610,15 +582,10 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 ;;
 
+let diff l1 l2 = List.filter (fun x -> not (List.mem x l2)) l1 in
 
 
-let pt = parse ecg_parse_table primes_prog;;
-let ast = ast_ize_P pt;;
-
-
-
-
-let rec translate (ast:ast_sl) =
+let rec translate (ast:ast_sl) : string*string =
     let precode =
     "#include <stdio.h>\n"^
     "#include <stdlib.h>\n\n"^
@@ -653,12 +620,18 @@ let rec translate (ast:ast_sl) =
 
     let postcode = "return 0;\n}\n" in
     let (innercode,all_vars,used_vars) = translate_sl ast [] [] in
-    precode^(List.fold_left (fun y x -> y ^ "int* " ^ x ^ " = NULL;\n") "" (unique_sort all_vars) )^innercode^postcode
+    let unused_vars = (diff (unique_sort all_vars) (unique_sort used_vars)) in
+    let warnings = (if unused_vars = [] then ""
+                    else "Warning: the following variables where unused: " ^ List.fold_left (fun x y -> y ^ ", " ^ x) "" unused_vars) in
 
+    let code = precode^
+               (List.fold_left (fun y x -> y ^ "int* " ^ x ^ " = NULL;\n") "" (unique_sort all_vars) )^ (*Adds null pointer definitions*)
+               innercode^
+               postcode in
 
+    (warnings, code)
 
-
-and translate_sl (ast:ast_sl) (av:string list) (uv:string list) : string*string list*string list=
+and translate_sl (ast:ast_sl) (av:string list) (uv:string list) : string*string list*string list =
     match ast with
     | h::t -> let (s,avv,uvv) = translate_s h av uv in
       let (sl,avvv,uvvv) = translate_sl t avv uvv in
@@ -709,11 +682,64 @@ and translate_expr (ast:ast_e) (av:string list) (uv:string list) :string*string 
     | AST_binop (op,e1,e2)
     -> let (expr1,avv,uvv) = translate_expr e1 av uv in
        let (expr2,avvv,uvvv) = translate_expr e2 avv uvv in
-    match op with
-    | "/" -> ("(" ^ expr1^ op ^ "notZero(" ^ expr2 ^ "))", avvv, uvvv)
-    | "<>" -> ("(" ^ expr1 ^ "!=" ^ expr2 ^ ")", avvv, uvvv)
-    | oper -> ("(" ^ expr1 ^ oper ^ expr2 ^ ")", avvv, uvvv)
+        match op with
+        | "/" -> ("(" ^ expr1 ^ op ^ "notZero(" ^ expr2 ^ "))", avvv, uvvv)
+        | "<>" -> ("(" ^ expr1 ^ "!=" ^ expr2 ^ ")", avvv, uvvv)
+        | oper -> ("(" ^ expr1 ^ oper ^ expr2 ^ ")", avvv, uvvv)
 in
 
+let sum_ave_prog = "read a read b sum := a + b write sum write sum / 2" in
+let order_of_operation = "if 3 <> 4 write 3*(4+5) fi" in
+let primes_prog = "
+     read n
+     randvar2 := 3
+     cp := 2
+     do check n > 0
+         found := 0
+         cf1 := 2
+         cf1s := cf1 * cf1
+         do check cf1s <= cp
+             cf2 := 2
+             pr := cf1 * cf2
+             do check pr <= cp
+                 if pr == cp
+                     found := 1
+                 fi
+                 cf2 := cf2 + 1
+                 pr := cf1 * cf2
+             od
+             cf1 := cf1 + 1
+             cf1s := cf1 * cf1
+         od
+         if found == 0
+             write cp
+             n := n - 1
+         fi
+         cp := cp + 1
+     od
+     read randvar" in
 
-print_string (translate ast);;
+let compile program =
+  translate (ast_ize_P (parse ecg_parse_table program))
+in
+let primes_w, primes_p = compile primes_prog in
+let sum_w, sum_p = compile sum_ave_prog in
+let oop_w, oop_p = compile order_of_operation in
+
+print_string "Primes program:\n";
+print_string primes_p;
+print_string "Primes warnings\n";
+print_string primes_w;
+print_string "\n\n";
+print_string "Sum average program:\n";
+print_string sum_p;
+print_string "Sums warnings\n";
+print_string sum_w;
+print_string "\n\n";
+print_string "Order of operation program:\n";
+print_string oop_p;
+print_string "Order of operations warnings\n";
+print_string oop_w;
+
+let ast_primes = ast_ize_P (parse ecg_parse_table primes_prog) in
+ast_primes;;
